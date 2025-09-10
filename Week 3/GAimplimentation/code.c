@@ -8,7 +8,7 @@ CROSSOVER_RATE = 0.7
 MUTATION_RATE = 0.1
 X_MIN, X_MAX = 0, 255
 
-img = cv2.imread('D:/1BM23CS145/BIS/download.jpg', 0)
+img = cv2.imread('D:/1BM23CS146/download.jpg', 0)
 if img is None:
     raise FileNotFoundError("Image not found. Please check the file path.")
 
