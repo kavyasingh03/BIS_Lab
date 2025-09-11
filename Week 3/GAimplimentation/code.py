@@ -2,13 +2,14 @@ import cv2
 import numpy as np
 import random
 
-POP_SIZE = 20
-GENS = 15
-CROSSOVER_RATE = 0.7
-MUTATION_RATE = 0.1
+POP_SIZE = 10
+GENS = 30
+CROSSOVER_RATE = 0.65
+MUTATION_RATE = 0.2
 X_MIN, X_MAX = 0, 255
 
-img = cv2.imread('D:/1BM23CS146/download.jpg', 0)
+img = cv2.imread('D:/1BM23CS146/download.jpeg', 0)
+
 if img is None:
     raise FileNotFoundError("Image not found. Please check the file path.")
 
@@ -16,12 +17,16 @@ hist = cv2.calcHist([img], [0], None, [256], [0, 256]).ravel()
 
 def fitness_function(threshold):
     threshold = int(threshold)
+
     w0 = np.sum(hist[:threshold])
     w1 = np.sum(hist[threshold:])
+
     if w0 == 0 or w1 == 0:
         return 0
+
     mu0 = np.sum(np.arange(0, threshold) * hist[:threshold]) / w0
     mu1 = np.sum(np.arange(threshold, 256) * hist[threshold:]) / w1
+
     return w0 * w1 * ((mu0 - mu1) ** 2)
 
 def create_individual():
@@ -48,6 +53,7 @@ def mutate(individual):
 def genetic_algorithm():
     population = [create_individual() for _ in range(POP_SIZE)]
     best_solution = max(population, key=fitness_function)
+
     for generation in range(GENS):
         new_population = []
         for _ in range(POP_SIZE):
@@ -55,12 +61,16 @@ def genetic_algorithm():
             child = crossover(parent1, parent2)
             child = mutate(child)
             new_population.append(child)
+
         population = new_population
         current_best = max(population, key=fitness_function)
         if fitness_function(current_best) > fitness_function(best_solution):
             best_solution = current_best
+
         print(f"Generation {generation + 1}: Best Threshold = {best_solution}")
+
     print(f"\nBest threshold found: {best_solution}")
+
     _, segmented_img = cv2.threshold(img, best_solution, 255, cv2.THRESH_BINARY)
     cv2.imwrite("segmented.jpg", segmented_img)
     print("Segmented image saved as 'segmented.jpg'.")
