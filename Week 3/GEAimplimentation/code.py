@@ -2,73 +2,86 @@ import cv2
 import numpy as np
 import random
 
-POPULATION_SIZE = 20
-GENERATIONS = 15
-CROSSOVER_PROB = 0.7
-MUTATION_PROB = 0.1
-GENE_LENGTH = 8
+POP_SIZE = 15
+GENS = 20
+CROSSOVER_RATE = 0.65
+MUTATION_RATE = 0.2
+X_MIN, X_MAX = 0, 255
+GENES = 8  
 
-image = cv2.imread('D:/1BM23CS146/download.jpg', cv2.IMREAD_GRAYSCALE)
-if image is None:
-    raise FileNotFoundError("Image not found. Verify the image path.")
+img = cv2.imread('D:/1BM23CS146/download.jpeg', 0)
+if img is None:
+    raise FileNotFoundError("Image not found. Please check the file path.")
 
-histogram = cv2.calcHist([image], [0], None, [256], [0, 256]).flatten()
+hist = cv2.calcHist([img], [0], None, [256], [0, 256]).ravel()
 
-def calculate_fitness(thresh_val):
-    thresh_val = int(thresh_val)
-    weight_bg = np.sum(histogram[:thresh_val])
-    weight_fg = np.sum(histogram[thresh_val:])
-    if weight_bg == 0 or weight_fg == 0:
+def fitness_function(threshold):
+    threshold = int(threshold)
+
+    w0 = np.sum(hist[:threshold])
+    w1 = np.sum(hist[threshold:])
+
+    if w0 == 0 or w1 == 0:
         return 0
-    mean_bg = np.sum(np.linspace(0, thresh_val - 1, thresh_val) * histogram[:thresh_val]) / weight_bg
-    mean_fg = np.sum(np.linspace(thresh_val, 255, 256 - thresh_val) * histogram[thresh_val:]) / weight_fg
-    return weight_bg * weight_fg * ((mean_bg - mean_fg) ** 2)
 
-def generate_individual():
-    return ''.join(random.choices(['0', '1'], k=GENE_LENGTH))
+    mu0 = np.sum(np.arange(0, threshold) * hist[:threshold]) / w0
+    mu1 = np.sum(np.arange(threshold, 256) * hist[threshold:]) / w1
 
-def decode(chromosome):
-    return int(chromosome, 2)
+    return w0 * w1 * ((mu0 - mu1) ** 2)
 
-def select_two_parents(pop):
-    contenders = random.sample(pop, 3)
-    contenders.sort(key=lambda chrom: calculate_fitness(decode(chrom)), reverse=True)
-    return contenders[0], contenders[1]
+def create_individual():
+    return ''.join(random.choice(['0', '1']) for _ in range(GENES))
 
-def apply_crossover(p1, p2):
-    if random.random() < CROSSOVER_PROB:
-        point = random.randint(1, GENE_LENGTH - 1)
-        return p1[:point] + p2[point:]
-    return p1
+def decode_individual(individual):
+    return int(individual, 2)
 
-def apply_mutation(chrom):
-    if random.random() < MUTATION_PROB:
-        index = random.randint(0, GENE_LENGTH - 1)
-        chrom_list = list(chrom)
-        chrom_list[index] = '1' if chrom_list[index] == '0' else '0'
-        return ''.join(chrom_list)
-    return chrom
+def select_parents(population):
+    selected = random.sample(population, 3)
+    selected.sort(key=lambda ind: fitness_function(decode_individual(ind)), reverse=True)
+    return selected[0], selected[1]
 
-def run_genetic_algorithm():
-    population = [generate_individual() for _ in range(POPULATION_SIZE)]
-    best = max(population, key=lambda ind: calculate_fitness(decode(ind)))
-    for gen in range(GENERATIONS):
-        next_gen = []
-        for _ in range(POPULATION_SIZE):
-            parent_a, parent_b = select_two_parents(population)
-            offspring = apply_crossover(parent_a, parent_b)
-            offspring = apply_mutation(offspring)
-            next_gen.append(offspring)
-        population = next_gen
-        generation_best = max(population, key=lambda ind: calculate_fitness(decode(ind)))
-        if calculate_fitness(decode(generation_best)) > calculate_fitness(decode(best)):
-            best = generation_best
-        print(f"Generation {gen + 1}: Current Best Threshold = {decode(best)}")
-    final_threshold = decode(best)
-    print(f"\nOptimal threshold found: {final_threshold}")
-    _, result = cv2.threshold(image, final_threshold, 255, cv2.THRESH_BINARY)
-    cv2.imwrite("segmented_gea.jpg", result)
+def crossover(parent1, parent2):
+    if random.random() < CROSSOVER_RATE:
+        crossover_point = random.randint(1, GENES - 1)
+        child = parent1[:crossover_point] + parent2[crossover_point:]
+    else:
+        child = parent1
+    return child
+
+def mutate(individual):
+    if random.random() < MUTATION_RATE:
+        mutation_point = random.randint(0, GENES - 1)
+        mutated_individual = list(individual)
+        mutated_individual[mutation_point] = '1' if mutated_individual[mutation_point] == '0' else '0'
+        individual = ''.join(mutated_individual)
+    return individual
+
+def genetic_algorithm():
+
+    population = [create_individual() for _ in range(POP_SIZE)]
+    best_solution = max(population, key=lambda ind: fitness_function(decode_individual(ind)))
+
+    for generation in range(GENS):
+        new_population = []
+        for _ in range(POP_SIZE):
+            parent1, parent2 = select_parents(population)
+            child = crossover(parent1, parent2)
+            child = mutate(child)
+            new_population.append(child)
+
+        population = new_population
+        current_best = max(population, key=lambda ind: fitness_function(decode_individual(ind)))
+        if fitness_function(decode_individual(current_best)) > fitness_function(decode_individual(best_solution)):
+            best_solution = current_best
+
+        print(f"Generation {generation + 1}: Best Threshold (decoded) = {decode_individual(best_solution)}")
+
+    print(f"\nBest threshold found: {decode_individual(best_solution)}")
+
+    best_threshold = decode_individual(best_solution)
+    _, segmented_img = cv2.threshold(img, best_threshold, 255, cv2.THRESH_BINARY)
+    cv2.imwrite("segmented_gea.jpg", segmented_img)
     print("Segmented image saved as 'segmented_gea.jpg'.")
 
 if __name__ == "__main__":
-    run_genetic_algorithm()
+    genetic_algorithm()
